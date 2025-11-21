@@ -1,25 +1,58 @@
 pipeline {
     agent any
 
-    tools {
-        // EXACTEMENT le nom défini dans Global Tool Configuration
-        maven 'Maven_3_9'
+    environment {
+        M2_HOME = "/usr/share/maven"
+        PATH = "${env.M2_HOME}/bin:${env.PATH}"
+        DOCKERHUB_CREDENTIALS = 'dockerhub-cred'   
+        IMAGE_NAME = 'youssef21112/my-java-app'
     }
 
     stages {
-        stage('Build & Package') {
+
+        stage('Checkout') {
             steps {
-                sh 'mvn clean package -DskipTests'
+                git url: 'https://github.com/Youssseef21/Harrane_yousef_Sleam1.git', branch: 'main'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'mvn test -Dspring.profiles.active=test'
+            }
+        }
+
+        stage('Package') {
+            steps {
+                sh 'mvn package -DskipTests'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh "docker build -t ${IMAGE_NAME}:latest ."
+            }
+        }
+
+        stage('Push to DockerHub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+                    sh "docker push ${IMAGE_NAME}:latest"
+                }
             }
         }
     }
 
     post {
+        always {
+            echo "Pipeline finished"
+        }
         success {
-            echo '✅ Build réussi (tests ignorés).'
+            echo "Build succeeded!"
         }
         failure {
-            echo '❌ Build cassé, va voir les logs.'
+            echo "Build failed!"
         }
     }
 }
