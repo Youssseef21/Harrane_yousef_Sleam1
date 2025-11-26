@@ -5,7 +5,7 @@ pipeline {
         M2_HOME = "/usr/share/maven"
         PATH = "${env.M2_HOME}/bin:${env.PATH}"
         DOCKERHUB_CREDENTIALS = 'dockerhub-cred'   
-        IMAGE_NAME = 'youssef21112/my-java-app'
+        IMAGE_NAME = 'youssef21112/myproj'
     }
 
     stages {
@@ -22,9 +22,23 @@ pipeline {
             }
         }
 
+        stage('SonarQube Analysis') {
+            steps {
+                // Inject the SONAR_AUTH_TOKEN credential from Jenkins
+                withCredentials([string(credentialsId: 'SONAR_AUTH_TOKEN', variable: 'TOKEN')]) {
+                    sh """
+                        mvn sonar:sonar \
+                            -Dsonar.projectKey=myproj \
+                            -Dsonar.host.url=http://192.168.175.131:9000 \
+                            -Dsonar.login=$TOKEN
+                    """
+                }
+            }
+        }
+
         stage('Package') {
             steps {
-                sh 'mvn package -DskipTests'
+                sh 'mvn clean package -Dspring.profiles.active=test'
             }
         }
 
