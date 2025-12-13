@@ -9,7 +9,7 @@ pipeline {
             steps {
                 echo "Stage Checkout start"
                 git url: 'https://github.com/Youssseef21/Harrane_yousef_Sleam1.git', branch: 'main'
-                echo "Stage Checkout done"
+                echo "Stage Checkout done correctly"
             }
         }
 
