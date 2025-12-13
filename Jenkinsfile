@@ -4,8 +4,10 @@ pipeline {
     environment {
         M2_HOME = "/usr/share/maven"
         PATH = "${env.M2_HOME}/bin:${env.PATH}"
-        DOCKERHUB_CREDENTIALS = 'dockerhub-cred'   
+        DOCKERHUB_CREDENTIALS = 'dockerhub-cred'
         IMAGE_NAME = 'youssef21112/myproj'
+        SONARQUBE_URL = 'http://192.168.49.2:30900' // ou NodePort exposé
+        SONARQUBE_TOKEN = credentials('sonar-token') // token généré sur SonarQube
     }
 
     stages {
@@ -16,29 +18,20 @@ pipeline {
             }
         }
 
-        stage('Test') {
+        stage('Build with Maven') {
             steps {
-                sh 'mvn test -Dspring.profiles.active=test'
+                sh 'mvn clean install -DskipTests'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                // Inject the SONAR_AUTH_TOKEN credential from Jenkins
-                withCredentials([string(credentialsId: 'SONAR_AUTH_TOKEN', variable: 'TOKEN')]) {
-                    sh """
-                        mvn sonar:sonar \
-                            -Dsonar.projectKey=myproj \
-                            -Dsonar.host.url=http://192.168.175.131:9000 \
-                            -Dsonar.login=$TOKEN
-                    """
-                }
-            }
-        }
-
-        stage('Package') {
-            steps {
-                sh 'mvn clean package -Dspring.profiles.active=test'
+                sh """
+                    mvn sonar:sonar \
+                        -Dsonar.projectKey=myproj \
+                        -Dsonar.host.url=${SONARQUBE_URL} \
+                        -Dsonar.login=${SONARQUBE_TOKEN}
+                """
             }
         }
 
@@ -54,6 +47,18 @@ pipeline {
                     sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
                     sh "docker push ${IMAGE_NAME}:latest"
                 }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                echo "Déploiement MySQL + Spring Boot + SonarQube sur Kubernetes"
+                sh 'kubectl apply -f /home/vagrant/mysql-all.yaml'
+                sh 'kubectl rollout status deployment/mysql'
+                sh 'kubectl apply -f /home/vagrant/spring-deployment.yaml'
+                sh 'kubectl rollout status deployment/spring-app'
+                sh 'kubectl get pods'
+                sh 'kubectl get svc'
             }
         }
     }
